@@ -156,6 +156,7 @@ pub async fn spawn(mut config: NodeConfig) -> (EthApi, NodeHandle) {
         logger,
         filters.clone(),
         transaction_order,
+        config.clone(),
     );
 
     // spawn the node service

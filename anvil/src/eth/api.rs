@@ -20,7 +20,7 @@ use crate::{
     filter::{EthFilter, Filters, LogsFilter},
     mem::transaction_build,
     revm::TransactOut,
-    ClientFork, LoggingManager, Miner, MiningMode, StorageInfo,
+    ClientFork, LoggingManager, Miner, MiningMode, StorageInfo, NodeConfig,
 };
 use anvil_core::{
     eth::{
@@ -98,6 +98,7 @@ pub struct EthApi {
     transaction_order: Arc<RwLock<TransactionOrder>>,
     /// Whether we're listening for RPC calls
     net_listening: bool,
+    node_config: NodeConfig,
 }
 
 // === impl Eth RPC API ===
@@ -115,6 +116,7 @@ impl EthApi {
         logger: LoggingManager,
         filters: Filters,
         transactions_order: TransactionOrder,
+        node_config: NodeConfig,
     ) -> Self {
         Self {
             pool,
@@ -128,6 +130,7 @@ impl EthApi {
             filters,
             net_listening: true,
             transaction_order: Arc::new(RwLock::new(transactions_order)),
+            node_config,
         }
     }
 
@@ -330,6 +333,7 @@ impl EthApi {
             EthRequest::TxPoolStatus(_) => self.txpool_status().await.to_rpc_result(),
             EthRequest::TxPoolInspect(_) => self.txpool_inspect().await.to_rpc_result(),
             EthRequest::TxPoolContent(_) => self.txpool_content().await.to_rpc_result(),
+            EthRequest::NodeInfo(()) => self.nodeinfo().to_rpc_result(),
         }
     }
 
@@ -1702,6 +1706,43 @@ impl EthApi {
         }
 
         Ok(content)
+    }
+
+    /// Returns the configuration.
+    ///
+    /// Handler for ETH RPC call: `anvil_nodeInfo`
+    pub fn nodeinfo(&self) -> Result<serde_json::Value> {
+        node_info!("anvil_nodeInfo");
+        let best_block_header = self.backend.get_block(self.backend.best_number()).map(|b| b.header);
+        Ok(serde_json::json!({
+            "chain_id": self.node_config.get_chain_id(),
+            "gas_limit": format!("{}", self.node_config.gas_limit),
+            "gas_price": format!("{}", self.node_config.get_gas_price()),
+            "base_fee": format!("{}", self.node_config.get_base_fee()),
+            "genesis_accounts": self.node_config.genesis_accounts.len(),
+            "genesis_balance": self.node_config.genesis_balance,
+            "genesis_timestamp": self.node_config.get_genesis_timestamp(),
+            "mining_mode": match (self.miner.is_auto_mine(), self.miner.is_interval()) {
+                (true,false) => "auto",
+                (false,true) => "interval",
+                _ => "manual",
+            },
+            "block_time": self.miner.get_block_interval(),
+            "port": self.node_config.port,
+            "max_transactions": self.node_config.max_transactions,
+            "tracing": self.node_config.enable_tracing,
+            "no_storage_caching": self.node_config.no_storage_caching,
+            "allow_origin": self.node_config.server_config.allow_origin,
+            "no_cors": self.node_config.server_config.no_cors,
+            "transaction_order": match self.node_config.transaction_order {
+                TransactionOrder::Fifo => "fifo",
+                TransactionOrder::Fees => "fees"
+            },
+            "code_size_limit": self.node_config.code_size_limit,
+            "current_block_number": best_block_header.as_ref().map(|h| h.number),
+            "current_block_timestamp": best_block_header.as_ref().map(|h| h.timestamp),
+            "current_block_hash": best_block_header.as_ref().map(|h| h.hash()),
+        }))
     }
 }
 

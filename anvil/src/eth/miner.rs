@@ -52,6 +52,14 @@ impl Miner {
         matches!(*mode, MiningMode::FixedBlockTime(_))
     }
 
+    pub fn get_block_interval(&self) -> Option<Duration> {
+        let mode = self.mode.read();
+        match &*mode {
+            MiningMode::FixedBlockTime(miner) => Some(miner.interval.period()),
+            _ => None
+        }
+    }
+
     /// Sets the mining mode to operate in
     pub fn set_mining_mode(&self, mode: MiningMode) {
         let new_mode = format!("{:?}", mode);

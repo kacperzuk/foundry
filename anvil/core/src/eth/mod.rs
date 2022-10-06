@@ -416,6 +416,10 @@ pub enum EthRequest {
     /// Ref: [Here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content)
     #[serde(rename = "txpool_content", with = "empty_params")]
     TxPoolContent(()),
+
+    /// Returns the configuration
+    #[serde(rename = "anvil_nodeInfo", with = "empty_params")]
+    NodeInfo(()),
 }
 
 /// Represents ethereum JSON-RPC API
